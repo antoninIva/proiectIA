@@ -47,7 +47,7 @@ class Piece:
         if abs(move.new_x-piece.x)>1 or abs(move.new_y-piece.y)>1:
             return False
         for p in current_board.pieces:
-            if p.x==move.new_x and p.y==move.new_y:
+            if p.x==move.new_x and p.y==move.new_y and p.type==PieceType.Standing:
                 return False
         return current_board.size > move.new_x >= 0 and  current_board.size > move.new_y >= 0
 
@@ -56,8 +56,10 @@ class Board:
         if board is None:
             self.size = 4
             self.pieces = []
-            for i in range(self.size):
+            for i in range(self.size-2):
                 self.pieces.append(Piece(i, self.size - 1, i, PlayerType.Computer, PieceType.Flat))
+            for i in range(self.size - 2, self.size):
+                self.pieces.append(Piece(i, self.size - 1, i, PlayerType.Computer, PieceType.Standing))
             for i in range(self.size-2):
                 self.pieces.append(Piece(i, 0, i + self.size, PlayerType.Human, PieceType.Flat))
             for i in range(self.size - 2, self.size):
@@ -79,8 +81,12 @@ class Board:
     def make_move(self, move):
         next_board = Board(self)  # copy
         if move is not None:
-            next_board.pieces[move.piece_id].x = move.new_x
-            next_board.pieces[move.piece_id].y = move.new_y
+            start_x = self.pieces[move.piece_id].x
+            start_y = self.pieces[move.piece_id].y
+            for p in next_board.pieces:
+                if p.x == start_x and p.y == start_y:
+                    p.x = move.new_x
+                    p.y = move.new_y
         return next_board
 
     def check_finish(self):
