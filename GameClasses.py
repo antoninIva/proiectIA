@@ -1,19 +1,23 @@
 import random
 
+
 class PlayerType:
     NoPlayer = 0
     Computer = 1
     Human = 2
 
+
 class PieceType:
-    Flat=0
+    Flat = 0
     Standing = 1
+
 
 class Move:
     def __init__(self, piece_id, new_x, new_y):
         self.piece_id = piece_id
         self.new_x = new_x
         self.new_y = new_y
+
 
 class Piece:
     def __init__(self, x, y, piece_id, player, type):
@@ -24,7 +28,7 @@ class Piece:
         self.type = type
 
     def valid_moves(self, current_board):
-        moves_list=[]
+        moves_list = []
         for i in range(-1, 2):
             for j in range(-1, 2):
                 if self.is_valid_move(current_board, Move(self.id, self.x + i, self.y + j)):
@@ -32,7 +36,7 @@ class Piece:
         return moves_list
 
     def is_valid_move(self, current_board, move):
-        piece=None
+        piece = None
         for p in current_board.pieces:
             if p.id == move.piece_id:
                 piece = p
@@ -44,12 +48,14 @@ class Piece:
             return False
         if move.new_x == piece.x and move.new_y == piece.y:
             return False
-        if abs(move.new_x-piece.x)>1 or abs(move.new_y-piece.y)>1:
+        if abs(move.new_x - piece.x) > 1 or abs(move.new_y - piece.y) > 1:
             return False
-        for p in current_board.pieces:
-            if p.x==move.new_x and p.y==move.new_y and p.type==PieceType.Standing:
-                return False
-        return current_board.size > move.new_x >= 0 and  current_board.size > move.new_y >= 0
+        top_piece = current_board.get_top_piece(move.new_x, move.new_y)
+        if top_piece is not None and top_piece.type == PieceType.Standing:
+            return False
+
+        return current_board.size > move.new_x >= 0 and current_board.size > move.new_y >= 0
+
 
 class Board:
     def __init__(self, board=None):
@@ -70,25 +76,64 @@ class Board:
                 PlayerType.Computer: dict(board.available_pieces[PlayerType.Computer])
             }
 
-    def pozitii_linie_scop(self, scop):
-        s=0
+    def get_top_piece(self, x, y):
+        top_piece = None
+        max_id = -1
         for p in self.pieces:
-            if p.y == scop:
-                s=s+1
-        return s
+            if p.x == x and p.y == y and p.id > max_id:
+                max_id = p.id
+                top_piece = p
+        return top_piece
+
+    def longest_road_length(self, player):
+        player_top_flats = {}
+        for x in range(self.size):
+            for y in range(self.size):
+                p = self.get_top_piece(x, y)
+                if p is not None and p.player == player and p.type == PieceType.Flat:
+                    player_top_flats[(x, y)] = p
+
+        max_length = 0
+
+        def dfs_max_path(x, y, current_visited_path):
+            nonlocal max_length
+
+            current_path_length = len(current_visited_path)
+            max_length = max(max_length, current_path_length)
+
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                nx, ny = x + dx, y + dy
+                next_coord = (nx, ny)
+
+                if next_coord in player_top_flats and next_coord not in current_visited_path:
+                    new_visited_path = current_visited_path.copy()
+                    new_visited_path.add(next_coord)
+
+                    dfs_max_path(nx, ny, new_visited_path)
+
+        for start_coord in player_top_flats.keys():
+            dfs_max_path(start_coord[0], start_coord[1], {start_coord})
+
+        return max_length
 
     def evaluation_function(self):
-        return 12-sum([p.y for p in self.pieces if p.player == PlayerType.Human])-sum([p.y for p in self.pieces if p.player == PlayerType.Computer])+self.pozitii_linie_scop(0)-self.pozitii_linie_scop(self.size-1)
+        human_score = self.longest_road_length(PlayerType.Human)
+        computer_score = self.longest_road_length(PlayerType.Computer)
+        return computer_score - human_score
 
     def make_move(self, move):
-        next_board = Board(self)  # copy
+        next_board = Board(self)
         if move is not None:
-            start_x = self.pieces[move.piece_id].x
-            start_y = self.pieces[move.piece_id].y
-            for p in next_board.pieces:
-                if p.x == start_x and p.y == start_y:
-                    p.x = move.new_x
-                    p.y = move.new_y
+            mover = next((p for p in next_board.pieces if p.id == move.piece_id), None)
+            if mover is not None:
+                start_x, start_y = mover.x, mover.y
+                target_x, target_y = move.new_x, move.new_y
+                pieces_in_stack = [p for p in next_board.pieces if p.x == start_x and p.y == start_y]
+                for piece in pieces_in_stack:
+                    piece.x = target_x
+                    piece.y = target_y
+                mover.id = next_board.next_piece_id
+                next_board.next_piece_id += 1
         return next_board
 
     def place_piece(self, x, y, player, piece_type):
@@ -96,7 +141,9 @@ class Board:
             return None
         if self.available_pieces[player][piece_type] <= 0:
             return None
-
+        top_piece = self.get_top_piece(x, y)
+        if top_piece is not None:
+            return None
         new_board = Board(self)
         new_piece = Piece(x, y, new_board.next_piece_id, player, piece_type)
         new_board.pieces.append(new_piece)
@@ -105,95 +152,81 @@ class Board:
         return new_board
 
     def is_position_empty(self, x, y):
-        return not any(p.x == x and p.y == y for p in self.pieces)
+        return self.get_top_piece(x, y) is None
 
     def has_pieces_available(self, player):
         return any(count > 0 for count in self.available_pieces[player].values())
 
+    def has_road(self, player):
+        size = self.size
+        player_top_flats = {}
+        for x_coord in range(size):
+            for y_coord in range(size):
+                p = self.get_top_piece(x_coord, y_coord)
+                if p is not None and p.player == player and p.type == PieceType.Flat:
+                    player_top_flats[(x_coord, y_coord)] = p
+        visited_y = set()
+        queue_y = []
+        for coord, p in player_top_flats.items():
+            if p.y == 0:
+                queue_y.append(coord)
+        while queue_y:
+            x, y = queue_y.pop(0)
+            if (x, y) in visited_y:
+                continue
+            visited_y.add((x, y))
+            if y == size - 1:
+                return True
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                nx, ny = x + dx, y + dy
+                next_coord = (nx, ny)
+                if next_coord in player_top_flats and next_coord not in visited_y:
+                    queue_y.append(next_coord)
+        visited_x = set()
+        queue_x = []
+
+        for coord, p in player_top_flats.items():
+            if p.x == 0:
+                queue_x.append(coord)
+        while queue_x:
+            x, y = queue_x.pop(0)
+            if (x, y) in visited_x:
+                continue
+            visited_x.add((x, y))
+            if x == size - 1:
+                return True
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                nx, ny = x + dx, y + dy
+                next_coord = (nx, ny)
+                if next_coord in player_top_flats and next_coord not in visited_x:
+                    queue_x.append(next_coord)
+
+        return False
+
     def check_finish(self):
         finished = False
         winner = PlayerType.NoPlayer
-        humanpieces=[p for p in self.pieces if p.player == PlayerType.Human and p.type==PieceType.Flat]
-        existingpiecesonmaindiagonal=0
-        existingpiecesonseconddiagonal=0
-        for p in humanpieces:
-            if p.x==p.y:
-                existingpiecesonmaindiagonal += 1
-        if existingpiecesonmaindiagonal==self.size:
+        if self.has_road(PlayerType.Human):
             finished = True
             winner = PlayerType.Human
             return finished, winner
-
-        for p in humanpieces:
-            if p.x+p.y==self.size-1:
-                existingpiecesonseconddiagonal += 1
-        if existingpiecesonseconddiagonal==self.size:
-            finished = True
-            winner = PlayerType.Human
-            return finished, winner
-
-        biggestammountofpiecesonaline=[0,0,0,0]
-        for p in humanpieces:
-            biggestammountofpiecesonaline[p.x]+=1
-        if max(biggestammountofpiecesonaline)==self.size:
-            finished = True
-            winner = PlayerType.Human
-            return finished, winner
-
-        biggestammountofpiecesonacolumn = [0, 0, 0, 0]
-        for p in humanpieces:
-            biggestammountofpiecesonacolumn[p.y] += 1
-        if max(biggestammountofpiecesonacolumn) == self.size:
-            finished = True
-            winner = PlayerType.Human
-            return finished, winner
-
-        computerpieces = [p for p in self.pieces if p.player == PlayerType.Computer and p.type==PieceType.Flat]
-        existingpiecesonmaindiagonal = 0
-        existingpiecesonseconddiagonal = 0
-        for p in computerpieces:
-            if p.x == p.y:
-                existingpiecesonmaindiagonal += 1
-        if existingpiecesonmaindiagonal == self.size:
+        if self.has_road(PlayerType.Computer):
             finished = True
             winner = PlayerType.Computer
             return finished, winner
-
-        for p in computerpieces:
-            if p.x + p.y == self.size-1:
-                existingpiecesonseconddiagonal += 1
-        if existingpiecesonseconddiagonal == self.size:
-            finished = True
-            winner = PlayerType.Computer
-            return finished, winner
-
-        biggestammountofpiecesonaline = [0, 0, 0, 0]
-        for p in computerpieces:
-            biggestammountofpiecesonaline[p.x] += 1
-        if max(biggestammountofpiecesonaline) == self.size:
-            finished = True
-            winner = PlayerType.Computer
-            return finished, winner
-
-        biggestammountofpiecesonacolumn = [0, 0, 0, 0]
-        for p in computerpieces:
-            biggestammountofpiecesonacolumn[p.y] += 1
-        if max(biggestammountofpiecesonacolumn) == self.size:
-            finished = True
-            winner = PlayerType.Computer
-            return finished, winner
-
         return finished, winner
+
 
 class Minimax:
     _rand = random.Random()
+
     @staticmethod
     def find_next_board(current_board, depth=3, alpha=float('-inf'), beta=float('inf'), maximizing=True):
         finished, winner = current_board.check_finish()
         if finished or depth == 0:
             return current_board
         best_move = None
-        if maximizing:  # Computer
+        if maximizing:
             max_eval = float('-inf')
             for piece in current_board.pieces:
                 if piece.player == PlayerType.Computer:
