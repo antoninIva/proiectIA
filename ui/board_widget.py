@@ -31,6 +31,7 @@ class AnimatedPiece(QObject):
 class BoardWidget(QWidget):
     pieceClicked = pyqtSignal(int)
     moveRequested = pyqtSignal(object)
+    placementRequested = pyqtSignal(int, int, int)
 
     BOARD_SIZE = 600
     CELL_SIZE = BOARD_SIZE // 4
@@ -43,6 +44,8 @@ class BoardWidget(QWidget):
         self.valid_moves = []
         self.animated_pieces = {}
         self.animation_running = False
+        self.placement_mode = False
+        self.placement_piece_type = None
 
         self.setMinimumSize(self.BOARD_SIZE, self.BOARD_SIZE)
         self.setMaximumSize(self.BOARD_SIZE, self.BOARD_SIZE)
@@ -76,6 +79,24 @@ class BoardWidget(QWidget):
         self.selected_piece_id = None
         self.valid_moves = []
         self.update()
+
+    def set_placement_mode(self, piece_type):
+        if piece_type is None or piece_type == -1:
+            self.placement_mode = False
+            self.placement_piece_type = None
+        else:
+            self.placement_mode = True
+            self.placement_piece_type = piece_type
+            self.clear_selection()
+        self.update()
+
+    def get_empty_positions(self):
+        empty_positions = []
+        for x in range(4):
+            for y in range(4):
+                if self.board.is_position_empty(x, y):
+                    empty_positions.append((x, y))
+        return empty_positions
 
     def animate_move(self, move, callback=None):
         self.animation_running = True
@@ -131,20 +152,22 @@ class BoardWidget(QWidget):
         x = event.pos().x() // self.CELL_SIZE
         y = 3 - (event.pos().y() // self.CELL_SIZE)
 
-        # verifica daca mutarea e valida
+        if self.placement_mode and self.placement_piece_type is not None:
+            self.placementRequested.emit(x, y, self.placement_piece_type)
+            return
+
         if self.selected_piece_id is not None:
             for move in self.valid_moves:
                 if move.new_x == x and move.new_y == y:
                     self.moveRequested.emit(move)
                     return
 
-        # verifica daca a apasat pe o piesca
-        for piece in self.board.pieces:
-            if piece.x == x and piece.y == y:
-                self.pieceClicked.emit(piece.id)
-                return
+        pieces_at_position = [p for p in self.board.pieces if p.x == x and p.y == y]
+        if pieces_at_position:
+            top_piece = max(pieces_at_position, key=lambda p: p.id)
+            self.pieceClicked.emit(top_piece.id)
+            return
 
-        # daca a apasat pe un spatiu nepermis dispare selectia
         self.clear_selection()
 
     def paintEvent(self, event):
@@ -187,6 +210,24 @@ class BoardWidget(QWidget):
             )
 
     def _draw_valid_move_indicators(self, painter):
+        if self.placement_mode and self.placement_piece_type is not None:
+            empty_positions = self.get_empty_positions()
+            for x, y in empty_positions:
+                center_x = x * self.CELL_SIZE + self.CELL_SIZE // 2
+                center_y = (3 - y) * self.CELL_SIZE + self.CELL_SIZE // 2
+
+                color = QColor("#2196F3")
+                color.setAlpha(80)
+                painter.setBrush(QBrush(color))
+                painter.setPen(Qt.PenStyle.NoPen)
+
+                radius = 25
+                painter.drawEllipse(
+                    QPointF(center_x, center_y),
+                    radius, radius
+                )
+            return
+
         if not self.valid_moves:
             return
 
@@ -206,7 +247,8 @@ class BoardWidget(QWidget):
             )
 
     def _draw_pieces(self, painter):
-        for piece in self.board.pieces:
+        sorted_pieces = sorted(self.board.pieces, key=lambda p: p.id, reverse=False)
+        for piece in sorted_pieces:
             if piece.id in self.animated_pieces:
                 animated = self.animated_pieces[piece.id]
                 draw_x = animated.x

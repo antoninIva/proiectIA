@@ -56,17 +56,19 @@ class Board:
         if board is None:
             self.size = 4
             self.pieces = []
-            for i in range(self.size-2):
-                self.pieces.append(Piece(i, self.size - 1, i, PlayerType.Computer, PieceType.Flat))
-            for i in range(self.size - 2, self.size):
-                self.pieces.append(Piece(i, self.size - 1, i, PlayerType.Computer, PieceType.Standing))
-            for i in range(self.size-2):
-                self.pieces.append(Piece(i, 0, i + self.size, PlayerType.Human, PieceType.Flat))
-            for i in range(self.size - 2, self.size):
-                self.pieces.append(Piece(i, 0, i + self.size, PlayerType.Human, PieceType.Standing))
+            self.next_piece_id = 0
+            self.available_pieces = {
+                PlayerType.Human: {PieceType.Flat: 13, PieceType.Standing: 2},
+                PlayerType.Computer: {PieceType.Flat: 13, PieceType.Standing: 2}
+            }
         else:
             self.size = board.size
             self.pieces = [Piece(p.x, p.y, p.id, p.player, p.type) for p in board.pieces]
+            self.next_piece_id = board.next_piece_id
+            self.available_pieces = {
+                PlayerType.Human: dict(board.available_pieces[PlayerType.Human]),
+                PlayerType.Computer: dict(board.available_pieces[PlayerType.Computer])
+            }
 
     def pozitii_linie_scop(self, scop):
         s=0
@@ -88,6 +90,25 @@ class Board:
                     p.x = move.new_x
                     p.y = move.new_y
         return next_board
+
+    def place_piece(self, x, y, player, piece_type):
+        if not (0 <= x < self.size and 0 <= y < self.size):
+            return None
+        if self.available_pieces[player][piece_type] <= 0:
+            return None
+
+        new_board = Board(self)
+        new_piece = Piece(x, y, new_board.next_piece_id, player, piece_type)
+        new_board.pieces.append(new_piece)
+        new_board.next_piece_id += 1
+        new_board.available_pieces[player][piece_type] -= 1
+        return new_board
+
+    def is_position_empty(self, x, y):
+        return not any(p.x == x and p.y == y for p in self.pieces)
+
+    def has_pieces_available(self, player):
+        return any(count > 0 for count in self.available_pieces[player].values())
 
     def check_finish(self):
         finished = False

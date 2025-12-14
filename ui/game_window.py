@@ -2,12 +2,13 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                               QMessageBox, QMenuBar, QStatusBar)
 from PyQt6.QtCore import Qt, QThreadPool
 from PyQt6.QtGui import QAction
-from GameClasses import Board, PlayerType, Move
+from GameClasses import Board, PlayerType, Move, PieceType
 from .board_widget import BoardWidget
 from .timer_widget import TimerWidget
 from .difficulty_dialog import DifficultyDialog
 from .start_dialog import StartDialog
 from .minimax_worker import MinimaxWorker
+from .piece_inventory_widget import PieceInventoryWidget
 
 
 class TakGameWindow(QMainWindow):
@@ -44,6 +45,7 @@ class TakGameWindow(QMainWindow):
         self.board_widget = BoardWidget(self.board)
         self.board_widget.pieceClicked.connect(self._on_piece_clicked)
         self.board_widget.moveRequested.connect(self._on_move_requested)
+        self.board_widget.placementRequested.connect(self._on_placement_requested)
         main_layout.addWidget(self.board_widget)
 
         right_panel = QVBoxLayout()
@@ -51,6 +53,10 @@ class TakGameWindow(QMainWindow):
 
         self.timer_widget = TimerWidget()
         right_panel.addWidget(self.timer_widget)
+
+        self.inventory_widget = PieceInventoryWidget()
+        self.inventory_widget.pieceTypeSelected.connect(self._on_piece_type_selected)
+        right_panel.addWidget(self.inventory_widget)
 
         right_panel.addStretch()
 
@@ -201,6 +207,9 @@ class TakGameWindow(QMainWindow):
         self.board = Board()
         self.board_widget.set_board(self.board)
         self.board_widget.clear_selection()
+        self.board_widget.set_placement_mode(None)
+        self.inventory_widget.clear_selection()
+        self.inventory_widget.update_counts(self.board.available_pieces, PlayerType.Human)
         self.timer_widget.reset()
 
         if self.computer_starts:
@@ -232,6 +241,36 @@ class TakGameWindow(QMainWindow):
             "IA - Proiect"
         )
 
+    def _on_piece_type_selected(self, piece_type):
+        if piece_type == -1:
+            self.board_widget.set_placement_mode(None)
+        else:
+            self.board_widget.set_placement_mode(piece_type)
+
+    def _on_placement_requested(self, x, y, piece_type):
+        if self.current_player != PlayerType.Human:
+            return
+
+        new_board = self.board.place_piece(x, y, PlayerType.Human, piece_type)
+        if new_board is None:
+            return
+
+        self.board = new_board
+        self.board_widget.set_board(self.board)
+        self.board_widget.set_placement_mode(None)
+        self.inventory_widget.clear_selection()
+        self.inventory_widget.update_counts(self.board.available_pieces, PlayerType.Human)
+
+        finished, winner = self.board.check_finish()
+        if finished:
+            self._handle_game_over(winner)
+            return
+
+        self.current_player = PlayerType.Computer
+        self.timer_widget.set_current_player(self.current_player)
+        self._update_status_bar()
+        self._make_computer_move()
+
     def _on_piece_clicked(self, piece_id):
         if self.current_player != PlayerType.Human:
             return
@@ -247,6 +286,7 @@ class TakGameWindow(QMainWindow):
 
         if piece.player == PlayerType.Human:
             self.board_widget.set_selected_piece(piece_id)
+            self.inventory_widget.clear_selection()
         else:
             self.board_widget.clear_selection()
 
@@ -269,6 +309,7 @@ class TakGameWindow(QMainWindow):
         def after_animation():
             self.board = self.board.make_move(move)
             self.board_widget.set_board(self.board)
+            self.inventory_widget.update_counts(self.board.available_pieces, PlayerType.Human)
 
             finished, winner = self.board.check_finish()
             if finished:
@@ -295,6 +336,7 @@ class TakGameWindow(QMainWindow):
             def after_animation():
                 self.board = result_board
                 self.board_widget.set_board(self.board)
+                self.inventory_widget.update_counts(self.board.available_pieces, PlayerType.Human)
 
                 finished, winner = self.board.check_finish()
                 if finished:
@@ -309,6 +351,7 @@ class TakGameWindow(QMainWindow):
         else:
             self.board = result_board
             self.board_widget.set_board(self.board)
+            self.inventory_widget.update_counts(self.board.available_pieces, PlayerType.Human)
 
             finished, winner = self.board.check_finish()
             if finished:
@@ -323,18 +366,16 @@ class TakGameWindow(QMainWindow):
         QMessageBox.critical(
             self,
             "Eroare",
-            f"Eroare în calculul mutării: {error_msg}"
+            f"Eroare in calculul mutarii: {error_msg}"
         )
 
     def _find_move_difference(self, old_board, new_board):
-        """Find the move that was made between two boards"""
         for old_piece, new_piece in zip(old_board.pieces, new_board.pieces):
             if old_piece.x != new_piece.x or old_piece.y != new_piece.y:
                 return Move(old_piece.id, new_piece.x, new_piece.y)
         return None
 
     def _handle_game_over(self, winner):
-        """Handle game over"""
         self.current_player = PlayerType.NoPlayer
         self.timer_widget.pause()
         self._update_status_bar()

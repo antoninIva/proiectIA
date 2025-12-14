@@ -1,15 +1,14 @@
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
-from GameClasses import Minimax
+from GameClasses import Minimax, PlayerType
+from .minimax_wrapper import MinimaxWithPlacement
 
 
 class WorkerSignals(QObject):
-    """Signals for MinimaxWorker to communicate with main thread"""
-    finished = pyqtSignal(object)  # Emits the resulting board
-    error = pyqtSignal(str)  # Emits error message if something goes wrong
+    finished = pyqtSignal(object) 
+    error = pyqtSignal(str)  
 
 
 class MinimaxWorker(QRunnable):
-    """Worker thread for running Minimax algorithm without blocking UI"""
 
     def __init__(self, board, depth=3):
         super().__init__()
@@ -18,9 +17,12 @@ class MinimaxWorker(QRunnable):
         self.signals = WorkerSignals()
 
     def run(self):
-        """Execute Minimax algorithm in background thread"""
         try:
-            result_board = Minimax.find_next_board(self.board, self.depth)
+            result_board = MinimaxWithPlacement.find_best_board(
+                self.board,
+                self.depth,
+                PlayerType.Computer
+            )
             self.signals.finished.emit(result_board)
         except Exception as e:
             self.signals.error.emit(str(e))
