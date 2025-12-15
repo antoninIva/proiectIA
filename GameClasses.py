@@ -50,6 +50,9 @@ class Piece:
             return False
         if abs(move.new_x - piece.x) > 1 or abs(move.new_y - piece.y) > 1:
             return False
+        top_piece = current_board.get_top_piece(piece.x, piece.y)
+        if top_piece is None or top_piece.id != piece.id:
+            return False
         top_piece = current_board.get_top_piece(move.new_x, move.new_y)
         if top_piece is not None and top_piece.type == PieceType.Standing:
             return False
