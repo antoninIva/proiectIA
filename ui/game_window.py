@@ -330,9 +330,19 @@ class TakGameWindow(QMainWindow):
         self.thread_pool.start(worker)
 
     def _on_computer_move_finished(self, result_board):
+        print(f"\n[DEBUG COMPUTER] Mutare finalizata!")
+        print(f"[DEBUG COMPUTER] Board vechi: {len(self.board.pieces)} piese")
+        print(f"[DEBUG COMPUTER] Board nou: {len(result_board.pieces)} piese")
+
+        for p in result_board.pieces:
+            player_name = "Human" if p.player == PlayerType.Human else "Computer"
+            type_name = "Flat" if p.type == PieceType.Flat else "Standing"
+            print(f"  - ID={p.id}, Player={player_name}, Type={type_name}, Pos=({p.x},{p.y})")
+
         move = self._find_move_difference(self.board, result_board)
 
         if move:
+            print(f"[DEBUG COMPUTER] Detectat MOVEMENT: piece {move.piece_id} la ({move.new_x},{move.new_y})")
             def after_animation():
                 self.board = result_board
                 self.board_widget.set_board(self.board)
@@ -349,6 +359,7 @@ class TakGameWindow(QMainWindow):
 
             self.board_widget.animate_move(move, after_animation)
         else:
+            print(f"[DEBUG COMPUTER] Detectat PLACEMENT (nu e mutare)")
             self.board = result_board
             self.board_widget.set_board(self.board)
             self.inventory_widget.update_counts(self.board.available_pieces, PlayerType.Human)

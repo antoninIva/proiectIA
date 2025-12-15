@@ -10,7 +10,11 @@ class MinimaxWithPlacement:
     def find_best_action(board, depth, player):
         all_actions = generate_all_actions(board, player)
 
+        player_name = "Human" if player == PlayerType.Human else "Computer"
+        print(f"\n[DEBUG AI] {player_name} find_best_action: {len(all_actions)} actiuni posibile")
+
         if not all_actions:
+            print(f"[DEBUG AI] {player_name}: NU sunt actiuni disponibile!")
             return None
 
         best_action = None
@@ -42,6 +46,11 @@ class MinimaxWithPlacement:
                     best_score = score
                     best_action = action
 
+        if best_action:
+            print(f"[DEBUG AI] {player_name} alege: {best_action} (score={best_score})")
+        else:
+            print(f"[DEBUG AI] {player_name}: Nu s-a gasit best_action, folosesc prima actiune")
+
         return best_action
 
     @staticmethod
@@ -68,7 +77,7 @@ class FastPlacementAI:
             (1, 1), (2, 1), (1, 2), (2, 2),  # Centru
             (0, 1), (0, 2), (3, 1), (3, 2),  # Lateral
             (1, 0), (2, 0), (1, 3), (2, 3),  # Lateral vertical
-            (0, 0), (0, 3), (3, 0), (3, 3)   # Colturi (ultimele)
+            (0, 0), (0, 3), (3, 0), (3, 3)   # Colturi 
         ]
 
         for x, y in priority_positions:

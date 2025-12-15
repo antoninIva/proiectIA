@@ -49,16 +49,30 @@ def generate_all_actions(board, player):
     if board.has_pieces_available(player):
         for x in range(board.size):
             for y in range(board.size):
-                if board.is_position_empty(x, y):
-                    for piece_type in [PieceType.Flat, PieceType.Standing]:
-                        if board.available_pieces[player][piece_type] > 0:
-                            actions.append(Action(
-                                ActionType.PLACEMENT,
-                                x=x,
-                                y=y,
-                                player=player,
-                                piece_type=piece_type
-                            ))
+                pieces_here = [p for p in board.pieces if p.x == x and p.y == y]
+                has_standing = any(p.type == PieceType.Standing for p in pieces_here)
+                position_empty = len(pieces_here) == 0
+
+                # standing poate fi plasat doar pe pozitii goala
+                if board.available_pieces[player][PieceType.Standing] > 0 and position_empty:
+                    actions.append(Action(
+                        ActionType.PLACEMENT,
+                        x=x,
+                        y=y,
+                        player=player,
+                        piece_type=PieceType.Standing
+                    ))
+
+                # flat poate fi plasat pe pozitii goale SAU peste alte piese flat
+                # nu poate fi plasat pe standing
+                if board.available_pieces[player][PieceType.Flat] > 0 and not has_standing:
+                    actions.append(Action(
+                        ActionType.PLACEMENT,
+                        x=x,
+                        y=y,
+                        player=player,
+                        piece_type=PieceType.Flat
+                    ))
 
     for piece in board.pieces:
         if piece.player == player:
