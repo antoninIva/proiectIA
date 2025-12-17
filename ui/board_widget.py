@@ -153,7 +153,19 @@ class BoardWidget(QWidget):
         y = 3 - (event.pos().y() // self.CELL_SIZE)
 
         if self.placement_mode and self.placement_piece_type is not None:
-            self.placementRequested.emit(x, y, self.placement_piece_type)
+            pieces_here = [p for p in self.board.pieces if p.x == x and p.y == y]
+            has_standing = any(p.type == PieceType.Standing for p in pieces_here)
+            position_empty = len(pieces_here) == 0
+
+            # standing poate fi plasat doar pe pozitii goala
+            if self.placement_piece_type == PieceType.Standing:
+                if position_empty:
+                    self.placementRequested.emit(x, y, self.placement_piece_type)
+            # flat poate fi plasat pe pozitii goale SAU peste alte piese flat
+             # nu poate fi plasat pe standing
+            elif self.placement_piece_type == PieceType.Flat:
+                if not has_standing:
+                    self.placementRequested.emit(x, y, self.placement_piece_type)
             return
 
         if self.selected_piece_id is not None:
@@ -248,6 +260,7 @@ class BoardWidget(QWidget):
 
     def _draw_pieces(self, painter):
         sorted_pieces = sorted(self.board.pieces, key=lambda p: p.id, reverse=False)
+
         for piece in sorted_pieces:
             if piece.id in self.animated_pieces:
                 animated = self.animated_pieces[piece.id]
@@ -257,13 +270,21 @@ class BoardWidget(QWidget):
                 draw_x = piece.x
                 draw_y = piece.y
 
-            pixel_x = int(draw_x * self.CELL_SIZE + self.PIECE_MARGIN)
-            pixel_y = int((3 - draw_y) * self.CELL_SIZE + self.PIECE_MARGIN)
+            pieces_below = [p for p in sorted_pieces if p.x == draw_x and p.y == draw_y and p.id < piece.id]
+            stack_level = len(pieces_below)
+
+            if stack_level > 0:
+                print(f"[DEBUG DRAW] Piece ID={piece.id} at ({piece.x},{piece.y}): stack_level={stack_level}, piese dedesubt={[p.id for p in pieces_below]}")
+
+            stack_offset = stack_level * 8
+
+            pixel_x = int(draw_x * self.CELL_SIZE + self.PIECE_MARGIN + stack_offset)
+            pixel_y = int((3 - draw_y) * self.CELL_SIZE + self.PIECE_MARGIN - stack_offset)
             pixel_width = self.CELL_SIZE - 2 * self.PIECE_MARGIN
 
             if piece.type == PieceType.Flat:
-                pixel_height = pixel_width  
-            else:  
+                pixel_height = pixel_width
+            else:
                 pixel_height = pixel_width // 2  
 
             if piece.player == PlayerType.Computer:
