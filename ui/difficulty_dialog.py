@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                              QSlider, QPushButton)
+                             QSlider, QPushButton)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
@@ -8,6 +8,7 @@ class DifficultyDialog(QDialog):
 
     def __init__(self, current_depth=3, parent=None):
         super().__init__(parent)
+        if current_depth > 5: current_depth = 5
         self.selected_depth = current_depth
 
         self.setWindowTitle("Setari Dificultate")
@@ -30,8 +31,7 @@ class DifficultyDialog(QDialog):
         layout.addWidget(title)
 
         description = QLabel(
-            "Dificultatea determina cate mutari în avans gandeste calculatorul.\n"
-            "O valoare mai mare = mai inteligent, dar mai lent."
+            "Nivelul de dificultate determina cat de mult gandeste calculatorul.\n"
         )
         description.setWordWrap(True)
         description.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -43,15 +43,27 @@ class DifficultyDialog(QDialog):
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setMinimum(1)
-        self.slider.setMaximum(8)
-        self.slider.setValue(self.selected_depth)
+        self.slider.setMaximum(4)
+
+        slider_val = 2
+        if self.selected_depth == 2:
+            slider_val = 1
+        elif self.selected_depth == 3:
+            slider_val = 2
+        elif self.selected_depth == 4:
+            slider_val = 3
+        elif self.selected_depth >= 5:
+            slider_val = 4
+
+        self.slider.setValue(slider_val)
+
         self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.slider.setTickInterval(1)
         self.slider.valueChanged.connect(self._on_slider_changed)
         slider_layout.addWidget(self.slider)
 
         labels_layout = QHBoxLayout()
-        labels = ["1", "2", "3", "4", "5", "6", "7", "8"]
+        labels = ["1", "2", "3", "4"]
         for label_text in labels:
             label = QLabel(label_text)
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -74,7 +86,7 @@ class DifficultyDialog(QDialog):
         self.preview_label.setStyleSheet("color: #555;")
         layout.addWidget(self.preview_label)
 
-        self._on_slider_changed(self.selected_depth)
+        self._on_slider_changed(slider_val)
 
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
@@ -95,30 +107,25 @@ class DifficultyDialog(QDialog):
         self.setLayout(layout)
 
     def _on_slider_changed(self, value):
-        self.selected_depth = value
-
-        if value <= 2:
-            level_name = "Usor"
+        if value == 1:
+            self.selected_depth = 2
+            level_name = "Usor "
             level_color = "#4CAF50"
-        elif value <= 4:
-            level_name = "Mediu"
+        elif value == 2:
+            self.selected_depth = 3
+            level_name = "Mediu "
             level_color = "#FF9800"
-        elif value <= 6:
-            level_name = "Greu"
+        elif value == 3:
+            self.selected_depth = 4
+            level_name = "Greu "
             level_color = "#F44336"
         else:
-            level_name = "Expert"
+            self.selected_depth = 5
+            level_name = "Expert "
             level_color = "#9C27B0"
 
         self.level_label.setText(level_name)
         self.level_label.setStyleSheet(f"color: {level_color};")
-
-        if value == 1:
-            preview = "Calculatorul va gandi 1 mutare inainte"
-        else:
-            preview = f"Calculatorul va gandi {value} mutari înainte"
-
-        self.preview_label.setText(preview)
 
     def get_depth(self):
         return self.selected_depth

@@ -1,12 +1,9 @@
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
 from GameClasses import Minimax, PlayerType
-from .minimax_wrapper import MinimaxWithPlacement
-
 
 class WorkerSignals(QObject):
-    finished = pyqtSignal(object) 
-    error = pyqtSignal(str)  
-
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
 
 class MinimaxWorker(QRunnable):
 
@@ -18,11 +15,15 @@ class MinimaxWorker(QRunnable):
 
     def run(self):
         try:
-            result_board = MinimaxWithPlacement.find_best_board(
+            result_board = Minimax.find_next_board(
                 self.board,
                 self.depth,
-                PlayerType.Computer
+                float('-inf'),
+                float('inf'),
+                True
             )
             self.signals.finished.emit(result_board)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.signals.error.emit(str(e))
